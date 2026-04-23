@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { AppShell } from './components/layout/AppShell';
 import { AdminPage } from './features/admin/AdminPage';
 import { AuthPage } from './features/auth/AuthPage';
@@ -70,16 +71,19 @@ export default function App() {
   }
 
   return (
-    <Routes>
-      <Route element={<AppShell />}>
-        <Route index element={account.role === 'superadmin' ? <AdminPage /> : <DashboardPage />} />
-        <Route path="transactions" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <TransactionsPage />} />
-        <Route path="people" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <PeoplePage />} />
-        <Route path="obligations" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <ObligationsPage />} />
-        <Route path="settings" element={<SettingsPage />} />
-        <Route path="admin" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <Navigate to="/" replace />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={account.role === 'superadmin' ? <AdminPage /> : <DashboardPage />} />
+          <Route path="transactions" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <TransactionsPage />} />
+          <Route path="people" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <PeoplePage />} />
+          <Route path="obligations" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <ObligationsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
+          <Route path="admin" element={account.role === 'superadmin' ? <Navigate to="/" replace /> : <Navigate to="/" replace />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Analytics />
+    </>
   );
 }
