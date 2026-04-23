@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SUBSCRIPTION_CYCLES } from './constants';
+import { EXPENSE_CATEGORIES, PAYMENT_METHODS, SUBSCRIPTION_CYCLES } from './constants.js';
 
 const idSchema = z.string().min(1);
 const moneySchema = z.coerce.number().positive('Enter an amount greater than 0');

@@ -1,4 +1,4 @@
-import type { CurrencyCode, ExpenseCategory, PaymentMethod, SubscriptionCycle } from './models';
+import type { CurrencyCode, ExpenseCategory, PaymentMethod, SubscriptionCycle } from './models.js';
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   'Food',

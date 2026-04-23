@@ -9,10 +9,10 @@ import {
   sharedExpenseSchema,
   sharedGroupSchema,
   subscriptionSchema,
-} from '../src/domain/validation';
-import { makeId, requireAccount } from './_lib/auth';
-import { pool, transaction } from './_lib/db';
-import { fail, handleError, ok, readAction, setNoStore } from './_lib/http';
+} from '../src/domain/validation.js';
+import { makeId, requireAccount } from './_lib/auth.js';
+import { pool, transaction } from './_lib/db.js';
+import { fail, handleError, ok, readAction, setNoStore } from './_lib/http.js';
 
 function isoDate(value: unknown) {
   if (!value) return undefined;

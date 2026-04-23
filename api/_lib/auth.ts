@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { pool } from './db';
+import { pool } from './db.js';
 
 const COOKIE_NAME = 'hisab_session';
 const SESSION_DAYS = 30;

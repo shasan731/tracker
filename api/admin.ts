@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { createPasswordSalt, hashPassword, requireSuperadmin, type ServerAccount } from './_lib/auth';
-import { pool, transaction } from './_lib/db';
-import { fail, handleError, ok, readAction, setNoStore } from './_lib/http';
+import { createPasswordSalt, hashPassword, requireSuperadmin, type ServerAccount } from './_lib/auth.js';
+import { pool, transaction } from './_lib/db.js';
+import { fail, handleError, ok, readAction, setNoStore } from './_lib/http.js';
 
 const accountActionSchema = z.object({
   accountId: z.string().min(1),

@@ -1,8 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
-import { clearSessionCookie, createPasswordSalt, createSession, getCurrentAccount, hashPassword, makeId, publicAccount, verifyPassword } from './_lib/auth';
-import { pool } from './_lib/db';
-import { created, fail, handleError, ok, readAction, setNoStore } from './_lib/http';
+import { clearSessionCookie, createPasswordSalt, createSession, getCurrentAccount, hashPassword, makeId, publicAccount, verifyPassword } from './_lib/auth.js';
+import { pool } from './_lib/db.js';
+import { created, fail, handleError, ok, readAction, setNoStore } from './_lib/http.js';
 
 const signUpSchema = z
   .object({
