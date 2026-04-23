@@ -47,7 +47,7 @@ Example:
 ```env
 DATABASE_URL=postgres://postgres:your-local-password@localhost:5432/hisab
 AUTH_SECRET=replace-with-a-long-random-secret
-SUPERADMIN_EMAIL=admin@hisab.local
+SUPERADMIN_EMAIL=admin@admin.com
 SUPERADMIN_PASSWORD=change-this-password
 SUPERADMIN_NAME=Hisab Superadmin
 ```
