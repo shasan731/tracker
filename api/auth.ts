@@ -1,7 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { clearSessionCookie, createPasswordSalt, createSession, getCurrentAccount, hashPassword, makeId, publicAccount, verifyPassword } from './_lib/auth.js';
-import { pool } from './_lib/db.js';
+import { seedDemoData } from './_lib/demo.js';
+import { pool, transaction } from './_lib/db.js';
 import { created, fail, handleError, ok, readAction, setNoStore } from './_lib/http.js';
 
 const signUpSchema = z
@@ -57,11 +58,14 @@ export default async function handler(request: VercelRequest, response: VercelRe
       const salt = createPasswordSalt();
       const accountId = makeId('account');
       const role = 'user';
-      await pool.query(
-        `insert into accounts (id, name, email, role, status, password_hash, password_salt, created_at, updated_at)
-         values ($1, $2, $3, $4, 'active', $5, $6, now(), now())`,
-        [accountId, input.name, input.email, role, hashPassword(input.password, salt), salt],
-      );
+      await transaction(async (client) => {
+        await client.query(
+          `insert into accounts (id, name, email, role, status, password_hash, password_salt, created_at, updated_at)
+           values ($1, $2, $3, $4, 'active', $5, $6, now(), now())`,
+          [accountId, input.name, input.email, role, hashPassword(input.password, salt), salt],
+        );
+        await seedDemoData(accountId, client);
+      });
       await createSession(response, accountId);
       return created(response, {
         account: {

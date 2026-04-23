@@ -11,6 +11,7 @@ import {
   subscriptionSchema,
 } from '../src/domain/validation.js';
 import { makeId, requireAccount } from './_lib/auth.js';
+import { seedDemoData } from './_lib/demo.js';
 import { pool, transaction } from './_lib/db.js';
 import { fail, handleError, ok, readAction, setNoStore } from './_lib/http.js';
 
@@ -524,9 +525,15 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return ok(response);
     }
 
-    if (action === 'resetAll' || action === 'loadDemoData') {
+    if (action === 'resetAll') {
       await clearOwnedData(account.id);
       await ensurePreferences(account.id);
+      return ok(response);
+    }
+
+    if (action === 'loadDemoData') {
+      await clearOwnedData(account.id);
+      await seedDemoData(account.id);
       return ok(response);
     }
 

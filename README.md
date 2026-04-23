@@ -9,6 +9,7 @@ Hisab is a mobile-first Progressive Web App for personal expenses, shared expens
 - Postgres for accounts, sessions, admin controls, and finance data.
 - Server-side email/password authentication with salted PBKDF2 hashes.
 - HTTP-only session cookie.
+- New regular accounts are seeded with editable demo finance data.
 - Superadmin authorization enforced in API handlers.
 - Zustand stores call backend APIs and keep UI state.
 - Tailwind CSS, React Router, Zod, date-fns, Recharts.
@@ -139,7 +140,6 @@ The superadmin experience is separated from the personal finance app. Superadmin
 ## Current Limitations
 
 - JSON import is not implemented in Postgres mode yet.
-- `Load demo` currently resets account data instead of seeding demo finance records.
 - Offline mode caches the app shell, but finance data requires the backend.
 - Password recovery and email verification are not implemented.
 - Full offline sync can be added later with IndexedDB as a cache and sync queue.
