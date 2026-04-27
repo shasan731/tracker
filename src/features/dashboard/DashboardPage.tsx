@@ -1,6 +1,8 @@
+import { useNavigate } from 'react-router-dom';
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { AlertTriangle, CalendarClock, ChevronRight, TrendingDown, TrendingUp } from 'lucide-react';
+import { AlertTriangle, CalendarClock, ChevronRight, Plus, TrendingDown, TrendingUp } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 import { Card, SectionHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import {
@@ -13,25 +15,38 @@ import {
 import { formatShortDate } from '../../lib/date';
 import { formatMoney } from '../../lib/money';
 import { useFinanceStore } from '../../state/useFinanceStore';
+import { useUiStore } from '../../state/useUiStore';
 
 const colors = ['#0f766e', '#f59e0b', '#4f46e5', '#e11d48', '#0891b2', '#7c3aed', '#16a34a', '#64748b'];
 
+type ObligationMode = 'loans' | 'items' | 'subscriptions';
+
 export function DashboardPage() {
   const { preferences, contacts, expenses, loans, loanPayments, sharedExpenses, items, subscriptions, activities } = useFinanceStore();
+  const openAddFlow = useUiStore((state) => state.openAddFlow);
+  const navigate = useNavigate();
   const totals = getExpenseTotals(expenses);
   const stats = getObligationStats(contacts, loans, loanPayments, sharedExpenses, items, subscriptions);
   const categories = getMonthlyCategoryTotals(expenses);
   const trend = getLast7DayTrend(expenses);
   const upcoming = getUpcomingObligations(loans, loanPayments, items, subscriptions).slice(0, 6);
 
+  function goToObligations(mode: ObligationMode) {
+    navigate('/obligations', { state: { mode } });
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid grid-cols-2 gap-3">
         <SummaryCard label="Today" value={formatMoney(totals.today, preferences.currency)} icon={<TrendingDown size={18} />} tone="teal" />
-        <SummaryCard label="This month" value={formatMoney(totals.month, preferences.currency)} icon={<TrendingUp size={18} />} tone="indigo" />
-        <SummaryCard label="People owe me" value={formatMoney(stats.peopleOweMe, preferences.currency)} icon={<ChevronRight size={18} />} tone="emerald" />
-        <SummaryCard label="I owe others" value={formatMoney(stats.iOweOthers, preferences.currency)} icon={<AlertTriangle size={18} />} tone="amber" />
+        <SummaryCard label="This month" value={formatMoney(totals.month, preferences.currency)} icon={<TrendingUp size={18} />} tone="indigo" onClick={() => navigate('/transactions')} />
+        <SummaryCard label="People owe me" value={formatMoney(stats.peopleOweMe, preferences.currency)} icon={<ChevronRight size={18} />} tone="emerald" onClick={() => navigate('/people')} />
+        <SummaryCard label="I owe others" value={formatMoney(stats.iOweOthers, preferences.currency)} icon={<AlertTriangle size={18} />} tone="amber" onClick={() => navigate('/people')} />
       </section>
+
+      <Button variant="secondary" className="w-full" icon={<Plus size={16} />} onClick={() => openAddFlow('expense')}>
+        Log today's expense
+      </Button>
 
       <Card className="bg-slate-950 text-white dark:bg-slate-900">
         <div className="flex items-start justify-between gap-4">
@@ -93,18 +108,25 @@ export function DashboardPage() {
         <div className="space-y-2">
           {upcoming.length ? (
             upcoming.map((item) => (
-              <Card key={`${item.type}-${item.id}`} className="flex items-center justify-between gap-3 p-3">
-                <div className="flex items-center gap-3">
-                  <span className="grid h-10 w-10 place-items-center rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200">
-                    <CalendarClock size={18} />
-                  </span>
-                  <div>
-                    <p className="font-bold text-slate-900 dark:text-slate-50">{item.title}</p>
-                    <p className="text-xs text-slate-500">{formatShortDate(item.dueDate)}</p>
+              <button
+                key={`${item.type}-${item.id}`}
+                type="button"
+                className="w-full text-left"
+                onClick={() => goToObligations(item.type === 'loan' ? 'loans' : item.type === 'item' ? 'items' : 'subscriptions')}
+              >
+                <Card className="flex items-center justify-between gap-3 p-3 active:bg-slate-50 dark:active:bg-slate-900">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-10 w-10 place-items-center rounded-full bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200">
+                      <CalendarClock size={18} />
+                    </span>
+                    <div>
+                      <p className="font-bold text-slate-900 dark:text-slate-50">{item.title}</p>
+                      <p className="text-xs text-slate-500">{formatShortDate(item.dueDate)}</p>
+                    </div>
                   </div>
-                </div>
-                <Badge tone={item.overdue ? 'danger' : 'warn'}>{item.overdue ? 'Overdue' : 'Due soon'}</Badge>
-              </Card>
+                  <Badge tone={item.overdue ? 'danger' : 'warn'}>{item.overdue ? 'Overdue' : 'Due soon'}</Badge>
+                </Card>
+              </button>
             ))
           ) : (
             <EmptyState title="No due items" body="Upcoming reminders will appear here when dates get close." />
@@ -132,11 +154,13 @@ function SummaryCard({
   value,
   icon,
   tone,
+  onClick,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   tone: 'teal' | 'indigo' | 'emerald' | 'amber';
+  onClick?: () => void;
 }) {
   const toneClass = {
     teal: 'bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-200',
@@ -144,11 +168,20 @@ function SummaryCard({
     emerald: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200',
     amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-200',
   }[tone];
-  return (
-    <Card className="p-3">
+  const inner = (
+    <>
       <div className={`mb-3 grid h-9 w-9 place-items-center rounded-full ${toneClass}`}>{icon}</div>
       <p className="text-xs font-bold text-slate-500">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-950 dark:text-slate-50">{value}</p>
-    </Card>
+      {onClick ? <p className="mt-1 text-xs font-semibold text-slate-400">Tap to view →</p> : null}
+    </>
   );
+  if (onClick) {
+    return (
+      <button type="button" className="w-full text-left" onClick={onClick}>
+        <Card className="p-3 active:bg-slate-50 dark:active:bg-slate-900">{inner}</Card>
+      </button>
+    );
+  }
+  return <Card className="p-3">{inner}</Card>;
 }

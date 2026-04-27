@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { format, parseISO, subDays } from 'date-fns';
 import { Copy, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { BottomSheet } from '../../components/ui/BottomSheet';
@@ -19,6 +20,14 @@ import { SharedExpenseForm } from './SharedExpenseForm';
 import { SharedGroupForm } from './SharedGroupForm';
 
 type TransactionMode = 'daily' | 'shared';
+
+function dateLabel(dateStr: string): string {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  if (dateStr === today) return 'Today';
+  const yesterday = format(subDays(new Date(), 1), 'yyyy-MM-dd');
+  if (dateStr === yesterday) return 'Yesterday';
+  return format(parseISO(dateStr), 'MMMM d');
+}
 
 export function TransactionsPage() {
   const [mode, setMode] = useState<TransactionMode>('daily');
@@ -45,6 +54,7 @@ function DailyExpensesPanel() {
   const [category, setCategory] = useState<ExpenseCategory | 'All'>('All');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
   const totals = getExpenseTotals(expenses);
 
   const filtered = useMemo(
@@ -58,16 +68,33 @@ function DailyExpensesPanel() {
     [category, endDate, expenses, startDate],
   );
 
+  const hasFilter = category !== 'All' || Boolean(startDate) || Boolean(endDate);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const displayedToday = hasFilter
+    ? filtered.filter((e) => e.date === todayStr).reduce((sum, e) => sum + e.amount, 0)
+    : totals.today;
+  const displayedMonth = hasFilter ? filtered.reduce((sum, e) => sum + e.amount, 0) : totals.month;
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Expense[]>();
+    const sorted = [...filtered].sort((a, b) => b.date.localeCompare(a.date));
+    for (const expense of sorted) {
+      if (!map.has(expense.date)) map.set(expense.date, []);
+      map.get(expense.date)!.push(expense);
+    }
+    return [...map.entries()];
+  }, [filtered]);
+
   return (
     <section className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <Card className="p-3">
-          <p className="text-xs font-bold text-slate-500">Today</p>
-          <p className="mt-1 text-lg font-black">{formatMoney(totals.today, preferences.currency)}</p>
+          <p className="text-xs font-bold text-slate-500">{hasFilter ? 'Filtered · today' : 'Today'}</p>
+          <p className="mt-1 text-lg font-black">{formatMoney(displayedToday, preferences.currency)}</p>
         </Card>
         <Card className="p-3">
-          <p className="text-xs font-bold text-slate-500">This month</p>
-          <p className="mt-1 text-lg font-black">{formatMoney(totals.month, preferences.currency)}</p>
+          <p className="text-xs font-bold text-slate-500">{hasFilter ? 'Filtered total' : 'This month'}</p>
+          <p className="mt-1 text-lg font-black">{formatMoney(displayedMonth, preferences.currency)}</p>
         </Card>
       </div>
 
@@ -101,34 +128,59 @@ function DailyExpensesPanel() {
         }
       />
 
-      <div className="space-y-2">
-        {filtered.length ? (
-          filtered.map((expense) => (
-            <Card key={expense.id} className="p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate font-bold text-slate-950 dark:text-slate-50">{expense.note || expense.category}</p>
-                    <Badge tone="info">{expense.category}</Badge>
+      <div className="space-y-4">
+        {grouped.length ? (
+          grouped.map(([dateStr, groupExpenses]) => (
+            <div key={dateStr} className="space-y-2">
+              <p className="px-1 text-xs font-bold text-slate-500">{dateLabel(dateStr)}</p>
+              {groupExpenses.map((expense) => (
+                <Card key={expense.id} className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-bold text-slate-950 dark:text-slate-50">{expense.note || expense.category}</p>
+                        <Badge tone="info">{expense.category}</Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatFullDate(expense.date)} · {expense.paymentMethod}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-black">{formatMoney(expense.amount, preferences.currency)}</p>
                   </div>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {formatFullDate(expense.date)} · {expense.paymentMethod}
-                  </p>
-                </div>
-                <p className="shrink-0 font-black">{formatMoney(expense.amount, preferences.currency)}</p>
-              </div>
-              <div className="mt-3 flex gap-2">
-                <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Copy size={16} />} onClick={() => void duplicateExpense(expense.id)}>
-                  Duplicate
-                </Button>
-                <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(expense)}>
-                  Edit
-                </Button>
-                <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => void deleteExpense(expense.id)}>
-                  Delete
-                </Button>
-              </div>
-            </Card>
+                  {confirmDeleteExpenseId === expense.id ? (
+                    <div className="mt-3 flex items-center gap-2">
+                      <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete this expense?</p>
+                      <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteExpenseId(null)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="min-h-9 px-3 text-rose-600"
+                        icon={<Trash2 size={16} />}
+                        onClick={() => {
+                          void deleteExpense(expense.id);
+                          setConfirmDeleteExpenseId(null);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="mt-3 flex gap-2">
+                      <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Copy size={16} />} onClick={() => void duplicateExpense(expense.id)}>
+                        Duplicate
+                      </Button>
+                      <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(expense)}>
+                        Edit
+                      </Button>
+                      <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteExpenseId(expense.id)}>
+                        Delete
+                      </Button>
+                    </div>
+                  )}
+                </Card>
+              ))}
+            </div>
           ))
         ) : (
           <EmptyState title="No expenses found" body="Add daily expenses or loosen the current filters." />
@@ -155,6 +207,8 @@ function SharedExpensesPanel() {
   const openAddFlow = useUiStore((state) => state.openAddFlow);
   const [editing, setEditing] = useState<SharedExpense | undefined>();
   const [editingGroupId, setEditingGroupId] = useState<string | undefined>();
+  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
+  const [confirmDeleteGroupId, setConfirmDeleteGroupId] = useState<string | null>(null);
   const balances = getSharedBalances(sharedExpenses);
 
   function displayName(id: string) {
@@ -190,14 +244,34 @@ function SharedExpensesPanel() {
                     {groupExpenses.filter((expense) => !expense.settled).length} open
                   </Badge>
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <Button variant="ghost" className="min-h-9 flex-1 px-2" onClick={() => setEditingGroupId(group.id)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" className="min-h-9 px-3 text-rose-600" onClick={() => void deleteSharedGroup(group.id)}>
-                    Delete
-                  </Button>
-                </div>
+                {confirmDeleteGroupId === group.id ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete this group?</p>
+                    <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteGroupId(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-9 px-3 text-rose-600"
+                      icon={<Trash2 size={16} />}
+                      onClick={() => {
+                        void deleteSharedGroup(group.id);
+                        setConfirmDeleteGroupId(null);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2">
+                    <Button variant="ghost" className="min-h-9 flex-1 px-2" onClick={() => setEditingGroupId(group.id)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteGroupId(group.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })
@@ -250,17 +324,37 @@ function SharedExpensesPanel() {
                   <Badge tone={expense.settled ? 'good' : 'warn'}>{expense.settled ? 'Settled' : 'Open'}</Badge>
                 </div>
               </div>
-              <div className="mt-3 flex gap-2">
-                <Button variant="ghost" className="min-h-9 flex-1 px-2" onClick={() => void toggleSharedExpenseSettled(expense.id)}>
-                  {expense.settled ? 'Reopen' : 'Settle'}
-                </Button>
-                <Button variant="ghost" className="min-h-9 flex-1 px-2" onClick={() => setEditing(expense)}>
-                  Edit
-                </Button>
-                <Button variant="ghost" className="min-h-9 px-3 text-rose-600" onClick={() => void deleteSharedExpense(expense.id)}>
-                  Delete
-                </Button>
-              </div>
+              {confirmDeleteExpenseId === expense.id ? (
+                <div className="mt-3 flex items-center gap-2">
+                  <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete this expense?</p>
+                  <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteExpenseId(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="min-h-9 px-3 text-rose-600"
+                    icon={<Trash2 size={16} />}
+                    onClick={() => {
+                      void deleteSharedExpense(expense.id);
+                      setConfirmDeleteExpenseId(null);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3 flex gap-2">
+                  <Button variant="ghost" className="min-h-9 flex-1 px-2" onClick={() => void toggleSharedExpenseSettled(expense.id)}>
+                    {expense.settled ? 'Reopen' : 'Settle'}
+                  </Button>
+                  <Button variant="ghost" className="min-h-9 flex-1 px-2" onClick={() => setEditing(expense)}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteExpenseId(expense.id)}>
+                    Delete
+                  </Button>
+                </div>
+              )}
             </Card>
           ))
         ) : (

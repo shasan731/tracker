@@ -1,4 +1,4 @@
-import { CreditCard, HandCoins, PackageOpen, ReceiptText, Repeat, Users } from 'lucide-react';
+import { HandCoins, PackageOpen, ReceiptText, Repeat, UserPlus, Users } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { BottomSheet } from '../ui/BottomSheet';
 import { ExpenseForm } from '../../features/transactions/ExpenseForm';
@@ -27,7 +27,7 @@ const choices: { flow: AddFlowType; label: string; body: string; icon: React.Rea
   { flow: 'loan', label: 'Add Loan', body: 'Money lent or borrowed', icon: <HandCoins size={20} /> },
   { flow: 'item', label: 'Add Borrow/Lend Item', body: 'Track physical things', icon: <PackageOpen size={20} /> },
   { flow: 'subscription', label: 'Add Subscription', body: 'Recurring bill or renewal', icon: <Repeat size={20} /> },
-  { flow: 'contact', label: 'Add Person', body: 'Save a relationship', icon: <CreditCard size={20} /> },
+  { flow: 'contact', label: 'Add Person', body: 'Save a relationship', icon: <UserPlus size={20} /> },
 ];
 
 export function GlobalAddSheet() {

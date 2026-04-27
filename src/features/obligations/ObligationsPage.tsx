@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
-import { Check, Pencil, Plus, RotateCcw, Trash2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { addDays, addMonths, addYears, format, parseISO } from 'date-fns';
+import { Check, Pencil, Plus, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
@@ -24,8 +26,17 @@ import { SubscriptionForm } from './SubscriptionForm';
 
 type ObligationMode = 'loans' | 'items' | 'subscriptions';
 
+function advanceCycleDate(dateStr: string, cycle: 'weekly' | 'monthly' | 'yearly'): string {
+  const d = parseISO(dateStr);
+  if (cycle === 'weekly') return format(addDays(d, 7), 'yyyy-MM-dd');
+  if (cycle === 'monthly') return format(addMonths(d, 1), 'yyyy-MM-dd');
+  return format(addYears(d, 1), 'yyyy-MM-dd');
+}
+
 export function ObligationsPage() {
-  const [mode, setMode] = useState<ObligationMode>('loans');
+  const location = useLocation();
+  const initialMode = (location.state as { mode?: ObligationMode } | null)?.mode ?? 'loans';
+  const [mode, setMode] = useState<ObligationMode>(initialMode);
   return (
     <div className="space-y-5">
       <SegmentedControl
@@ -50,6 +61,8 @@ function LoansPanel() {
   const [filter, setFilter] = useState<'all' | 'active' | 'settled' | 'overdue'>('active');
   const [editing, setEditing] = useState<Loan | undefined>();
   const [repaying, setRepaying] = useState<Loan | undefined>();
+  const [confirmDeleteLoanId, setConfirmDeleteLoanId] = useState<string | null>(null);
+  const [confirmDeletePaymentId, setConfirmDeletePaymentId] = useState<string | null>(null);
   const filtered = useMemo(
     () =>
       loans.filter((loan) => {
@@ -93,26 +106,75 @@ function LoansPanel() {
                   <div className="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-900">
                     <p className="mb-2 text-xs font-bold text-slate-500">Repayments</p>
                     {payments.map((payment) => (
-                      <div key={payment.id} className="flex items-center justify-between py-1 text-sm">
-                        <span>{formatFullDate(payment.date)}</span>
-                        <button type="button" onClick={() => void deleteLoanPayment(payment.id)} className="font-bold text-rose-600">
-                          {formatMoney(payment.amount, preferences.currency)}
-                        </button>
+                      <div key={payment.id} className="py-1 text-sm">
+                        {confirmDeletePaymentId === payment.id ? (
+                          <div className="flex items-center gap-2">
+                            <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Remove this payment?</p>
+                            <Button variant="ghost" className="min-h-8 px-2 text-xs" onClick={() => setConfirmDeletePaymentId(null)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              className="min-h-8 px-2 text-xs text-rose-600"
+                              onClick={() => {
+                                void deleteLoanPayment(payment.id);
+                                setConfirmDeletePaymentId(null);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <span>{formatFullDate(payment.date)}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold">{formatMoney(payment.amount, preferences.currency)}</span>
+                              <button
+                                type="button"
+                                aria-label="Delete payment"
+                                onClick={() => setConfirmDeletePaymentId(payment.id)}
+                                className="rounded p-0.5 text-rose-400 hover:text-rose-600"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
                 ) : null}
-                <div className="mt-3 flex gap-2">
-                  <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<RotateCcw size={16} />} onClick={() => setRepaying(loan)}>
-                    Repay
-                  </Button>
-                  <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(loan)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => void deleteLoan(loan.id)}>
-                    Delete
-                  </Button>
-                </div>
+                {confirmDeleteLoanId === loan.id ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete this loan?</p>
+                    <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteLoanId(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-9 px-3 text-rose-600"
+                      icon={<Trash2 size={16} />}
+                      onClick={() => {
+                        void deleteLoan(loan.id);
+                        setConfirmDeleteLoanId(null);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2">
+                    <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<RotateCcw size={16} />} onClick={() => setRepaying(loan)}>
+                      Repay
+                    </Button>
+                    <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(loan)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteLoanId(loan.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })
@@ -135,6 +197,7 @@ function ItemsPanel() {
   const openAddFlow = useUiStore((state) => state.openAddFlow);
   const [filter, setFilter] = useState<'active' | 'returned' | 'overdue' | 'all'>('active');
   const [editing, setEditing] = useState<ItemRecord | undefined>();
+  const [confirmDeleteItemId, setConfirmDeleteItemId] = useState<string | null>(null);
   const filtered = items.filter((item) => {
     const status = getDerivedItemStatus(item);
     return filter === 'all' || status === filter;
@@ -166,19 +229,39 @@ function ItemsPanel() {
                   <Badge tone={status === 'overdue' ? 'danger' : status === 'returned' ? 'good' : 'warn'}>{status}</Badge>
                 </div>
                 {item.note ? <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{item.note}</p> : null}
-                <div className="mt-3 flex gap-2">
-                  {item.status === 'active' ? (
-                    <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Check size={16} />} onClick={() => void markItemReturned(item.id)}>
-                      Returned
+                {confirmDeleteItemId === item.id ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete this item?</p>
+                    <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteItemId(null)}>
+                      Cancel
                     </Button>
-                  ) : null}
-                  <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(item)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => void deleteItem(item.id)}>
-                    Delete
-                  </Button>
-                </div>
+                    <Button
+                      variant="ghost"
+                      className="min-h-9 px-3 text-rose-600"
+                      icon={<Trash2 size={16} />}
+                      onClick={() => {
+                        void deleteItem(item.id);
+                        setConfirmDeleteItemId(null);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2">
+                    {item.status === 'active' ? (
+                      <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Check size={16} />} onClick={() => void markItemReturned(item.id)}>
+                        Returned
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(item)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteItemId(item.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })
@@ -194,10 +277,11 @@ function ItemsPanel() {
 }
 
 function SubscriptionsPanel() {
-  const { subscriptions, preferences, deleteSubscription } = useFinanceStore();
+  const { subscriptions, preferences, deleteSubscription, updateSubscription } = useFinanceStore();
   const openAddFlow = useUiStore((state) => state.openAddFlow);
   const [filter, setFilter] = useState<'active' | 'due' | 'cancelled' | 'all'>('active');
   const [editing, setEditing] = useState<Subscription | undefined>();
+  const [confirmDeleteSubId, setConfirmDeleteSubId] = useState<string | null>(null);
   const monthlyTotal = subscriptions.reduce((sum, subscription) => sum + getSubscriptionMonthlyCost(subscription), 0);
   const filtered = subscriptions.filter((subscription) => {
     if (filter === 'all') return true;
@@ -205,6 +289,19 @@ function SubscriptionsPanel() {
     if (filter === 'cancelled') return subscription.status === 'cancelled';
     return subscription.status === 'active';
   });
+
+  async function renewSubscription(subscription: Subscription) {
+    await updateSubscription(subscription.id, {
+      name: subscription.name,
+      amount: subscription.amount,
+      cycle: subscription.cycle,
+      category: subscription.category,
+      nextDueDate: advanceCycleDate(subscription.nextDueDate, subscription.cycle),
+      autoRenew: subscription.autoRenew,
+      notes: subscription.notes,
+      status: subscription.status,
+    });
+  }
 
   return (
     <section className="space-y-4">
@@ -223,6 +320,7 @@ function SubscriptionsPanel() {
       <div className="space-y-2">
         {filtered.length ? (
           filtered.map((subscription) => {
+            const isDue = isDateOverdue(subscription.nextDueDate) || isDateDueSoon(subscription.nextDueDate, 7);
             const dueState = isDateOverdue(subscription.nextDueDate) ? 'overdue' : isDateDueSoon(subscription.nextDueDate, 7) ? 'due soon' : subscription.status;
             return (
               <Card key={subscription.id} className="p-3">
@@ -240,14 +338,39 @@ function SubscriptionsPanel() {
                     </Badge>
                   </div>
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(subscription)}>
-                    Edit
-                  </Button>
-                  <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => void deleteSubscription(subscription.id)}>
-                    Delete
-                  </Button>
-                </div>
+                {confirmDeleteSubId === subscription.id ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete this bill?</p>
+                    <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteSubId(null)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-9 px-3 text-rose-600"
+                      icon={<Trash2 size={16} />}
+                      onClick={() => {
+                        void deleteSubscription(subscription.id);
+                        setConfirmDeleteSubId(null);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex gap-2">
+                    {isDue && subscription.status === 'active' ? (
+                      <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<RefreshCw size={16} />} onClick={() => void renewSubscription(subscription)}>
+                        Renew
+                      </Button>
+                    ) : null}
+                    <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(subscription)}>
+                      Edit
+                    </Button>
+                    <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteSubId(subscription.id)}>
+                      Delete
+                    </Button>
+                  </div>
+                )}
               </Card>
             );
           })

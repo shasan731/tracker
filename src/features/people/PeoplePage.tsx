@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { Check, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { Badge } from '../../components/ui/Badge';
 import { BottomSheet } from '../../components/ui/BottomSheet';
 import { Button } from '../../components/ui/Button';
 import { Card, SectionHeader } from '../../components/ui/Card';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { TextInput } from '../../components/ui/Form';
-import type { Contact } from '../../domain/models';
+import type { Contact, Loan } from '../../domain/models';
 import { getDerivedItemStatus, getDerivedLoanStatus, getLoanRemaining, getPersonSummaries } from '../../lib/calculations';
 import { formatFullDate, formatShortDate } from '../../lib/date';
 import { formatMoney } from '../../lib/money';
 import { useFinanceStore } from '../../state/useFinanceStore';
 import { useUiStore } from '../../state/useUiStore';
+import { LoanPaymentForm } from '../obligations/LoanForm';
 import { ContactForm } from './ContactForm';
 
 export function PeoplePage() {
@@ -20,6 +21,7 @@ export function PeoplePage() {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Contact | undefined>();
   const [editing, setEditing] = useState<Contact | undefined>();
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   const summaries = useMemo(
@@ -32,6 +34,7 @@ export function PeoplePage() {
     setError('');
     try {
       await deleteContact(contact.id);
+      setConfirmDeleteId(null);
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete person');
     }
@@ -92,14 +95,31 @@ export function PeoplePage() {
                   </div>
                 </div>
               </button>
-              <div className="mt-3 flex gap-2">
-                <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(summary.contact)}>
-                  Edit
-                </Button>
-                <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => void remove(summary.contact)}>
-                  Delete
-                </Button>
-              </div>
+              {confirmDeleteId === summary.contact.id ? (
+                <div className="mt-3 flex items-center gap-2">
+                  <p className="flex-1 text-sm font-semibold text-slate-700 dark:text-slate-300">Delete {summary.contact.name}?</p>
+                  <Button variant="ghost" className="min-h-9 px-3" onClick={() => setConfirmDeleteId(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="min-h-9 px-3 text-rose-600"
+                    icon={<Trash2 size={16} />}
+                    onClick={() => void remove(summary.contact)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3 flex gap-2">
+                  <Button variant="ghost" className="min-h-9 flex-1 px-2" icon={<Pencil size={16} />} onClick={() => setEditing(summary.contact)}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" className="min-h-9 px-3 text-rose-600" icon={<Trash2 size={16} />} onClick={() => setConfirmDeleteId(summary.contact.id)}>
+                    Delete
+                  </Button>
+                </div>
+              )}
             </Card>
           ))
         ) : (
@@ -134,12 +154,29 @@ function PersonDetail({
   activities,
 }: {
   contact: Contact;
-  loans: ReturnType<typeof useFinanceStore.getState>['loans'];
+  loans: Loan[];
   payments: ReturnType<typeof useFinanceStore.getState>['loanPayments'];
   items: ReturnType<typeof useFinanceStore.getState>['items'];
   activities: ReturnType<typeof useFinanceStore.getState>['activities'];
 }) {
-  const preferences = useFinanceStore((state) => state.preferences);
+  const { preferences, markItemReturned } = useFinanceStore();
+  const [repayingLoan, setRepayingLoan] = useState<Loan | null>(null);
+
+  if (repayingLoan) {
+    return (
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setRepayingLoan(null)}
+          className="flex items-center gap-1 text-sm font-semibold text-slate-600 dark:text-slate-400"
+        >
+          ← Back to {contact.name}
+        </button>
+        <LoanPaymentForm loan={repayingLoan} onDone={() => setRepayingLoan(null)} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
       <Card className="p-3">
@@ -168,6 +205,13 @@ function PersonDetail({
                       <Badge tone={status === 'overdue' ? 'danger' : status === 'settled' ? 'good' : 'warn'}>{status}</Badge>
                     </div>
                   </div>
+                  {status !== 'settled' ? (
+                    <div className="mt-3">
+                      <Button variant="ghost" className="min-h-9 w-full px-2" icon={<RotateCcw size={16} />} onClick={() => setRepayingLoan(loan)}>
+                        Record Repayment
+                      </Button>
+                    </div>
+                  ) : null}
                 </Card>
               );
             })
@@ -194,6 +238,13 @@ function PersonDetail({
                     </div>
                     <Badge tone={status === 'overdue' ? 'danger' : status === 'returned' ? 'good' : 'warn'}>{status}</Badge>
                   </div>
+                  {item.status === 'active' ? (
+                    <div className="mt-3">
+                      <Button variant="ghost" className="min-h-9 w-full px-2" icon={<Check size={16} />} onClick={() => void markItemReturned(item.id)}>
+                        Mark Returned
+                      </Button>
+                    </div>
+                  ) : null}
                 </Card>
               );
             })
